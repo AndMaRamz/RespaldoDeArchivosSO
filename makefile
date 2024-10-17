@@ -5,5 +5,5 @@ HEADERS=src/headers
 PROCESS=src/process
 FILES=child.c parent.c
 
-run: $(MAIN) $(addsuffix $(PROCESS), $(FILES))
+run: $(MAIN) $(addprefix $(PROCESS), $(FILES))
 	gcc -o programa $(MAIN) -I $(HEADERS) $(addprefix $(PROCESS), $(FILES))
