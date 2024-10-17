@@ -2,7 +2,7 @@
 
 MAIN=src/main.c
 HEADERS=src/headers
-PROCESS=src/process
+PROCESS=src/process/
 FILES=child.c parent.c
 
 run: $(MAIN) $(addprefix $(PROCESS), $(FILES))
