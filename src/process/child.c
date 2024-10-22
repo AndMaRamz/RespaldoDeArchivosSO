@@ -10,12 +10,12 @@ void respaldar_archivo(const char *archivo_origen, const char *archivo_destino) 
     system(comando);
 }
 
-void proceso_hijo(int pipefd[2], const char *directorio_origen, const char *directorio_respaldo) {
+void proceso_hijo(int parentToChild[2], int childToParent[2], const char *directorio_origen, const char *directorio_respaldo) {
     char buffer[256];
     int total_archivos;
     
     // Leer el número total de archivos del padre
-    read(pipefd[0], buffer, sizeof(buffer));
+    read(parentToChild[0], buffer, sizeof(buffer));
     total_archivos = atoi(buffer);
     
     printf("HIJO(pid=%d) esperando mensaje de mi padre...\n", getpid());
@@ -25,7 +25,7 @@ void proceso_hijo(int pipefd[2], const char *directorio_origen, const char *dire
     int archivos_restantes = total_archivos;
     
     while (1) {
-        read(pipefd[0], buffer, sizeof(buffer));
+        read(parentToChild[0], buffer, sizeof(buffer));
         
         if (strcmp(buffer, "FIN") == 0) {
             printf("HIJO (pid=%d): Adiós padre, terminé el respaldo!\n", getpid());
@@ -42,5 +42,5 @@ void proceso_hijo(int pipefd[2], const char *directorio_origen, const char *dire
     
     // Enviar el número de archivos respaldados al padre
     snprintf(buffer, sizeof(buffer), "%d", total_archivos);
-    write(pipefd[1], buffer, sizeof(buffer));
+    write(childToParent[1], buffer, sizeof(buffer));
 }

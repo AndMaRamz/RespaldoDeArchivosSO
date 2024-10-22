@@ -24,7 +24,7 @@ void crear_directorio_respaldo(const char *directorio_respaldo) {
     mkdir(directorio_respaldo, 0700);
 }
 
-void proceso_padre(const char *directorio_origen, const char *directorio_respaldo, int pipefd[2]) {
+void proceso_padre(const char *directorio_origen, const char *directorio_respaldo, int parentToChild[2], int childToParent[2]) {
     crear_directorio_respaldo(directorio_respaldo);
     
     DIR *dir;
@@ -51,7 +51,7 @@ void proceso_padre(const char *directorio_origen, const char *directorio_respald
     // Enviar el número total de archivos al hijo
     char buffer[256];
     snprintf(buffer, sizeof(buffer), "%d", total_archivos);
-    write(pipefd[1], buffer, sizeof(buffer));
+    write(parentToChild[1], buffer, sizeof(buffer));
     
     printf("—————— > RESPALDANDO %d ARCHIVOS <——————\n", total_archivos);
     
@@ -61,17 +61,17 @@ void proceso_padre(const char *directorio_origen, const char *directorio_respald
         if (ent->d_type == DT_REG) {
             snprintf(buffer, sizeof(buffer), "%s/%s", directorio_origen, ent->d_name);
             printf("(PADRE —> %s)\n", ent->d_name);
-            write(pipefd[1], buffer, sizeof(buffer));
+            write(parentToChild[1], buffer, sizeof(buffer));
             archivos_restantes--;
         }
     }
     
     // Enviar mensaje de finalización
     snprintf(buffer, sizeof(buffer), "FIN");
-    write(pipefd[1], buffer, sizeof(buffer));
+    write(parentToChild[1], buffer, sizeof(buffer));
     
     // Esperar la respuesta del hijo
-    read(pipefd[0], buffer, sizeof(buffer));
+    read(childToParent[0], buffer, sizeof(buffer));
     printf("PADRE (pid=%d) recibió un total de %s archivos respaldados exitosamente.\n", getpid(), buffer);
     
     closedir(dir);
