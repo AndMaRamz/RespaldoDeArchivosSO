@@ -4,44 +4,44 @@
 #include <sys/wait.h>
 #include "backup.h"
 
+extern const char *PIPE_CREATION_ERROR_MESSAGE, *PROCESS_CLONE_ERROR_MESSAGE;
+
 int main(int argc, char *argv[]) {
-    int parentToChild[2];
-    int childToParent[2];
+    int parentToChild[PIPE_FILE_DESCRIPTOR];
+    int childToParent[PIPE_FILE_DESCRIPTOR];
     
-    if (pipe(parentToChild) == -1) {
-        perror("Error al crear el pipe de padre a hijo");
+    if (pipe(parentToChild) == PIPE_CREATION_ERROR) {
+        perror(PIPE_CREATION_ERROR_MESSAGE);
         exit(EXIT_FAILURE);
     }
     
-    if (pipe(childToParent) == -1) {
-        perror("Error al crear el pipe de hijo a padre");
+    if (pipe(childToParent) == PIPE_CREATION_ERROR) {
+        perror(PIPE_CREATION_ERROR_MESSAGE);
         exit(EXIT_FAILURE);
     }
     
     pid_t pid = fork();
     
-    if (pid == -1) {
-        perror("Error al hacer fork");
+    if (pid == PROCESS_ID_ERROR) {
+        perror(PROCESS_CLONE_ERROR_MESSAGE);
         exit(EXIT_FAILURE);
     }
     
-    if (pid == 0) {
-        // Proceso hijo
-        close(parentToChild[1]); // Cierra escritura
-        close(childToParent[0]); // Cierra lectura
-        proceso_hijo(parentToChild, childToParent, argv[1], argv[2]);
-        close(parentToChild[0]); // Cierra lectura
-        close(childToParent[1]); // Cierra escritura
+    if (pid == PROCESS_ID_CHILD) {
+        close(parentToChild[PIPE_WRITE_SIDE]);
+        close(childToParent[PIPE_READ_SIDE]);
+        proceso_hijo(parentToChild, childToParent, argv[PROGRAM_SOURCE_ARG], argv[PROGRAM_DESTINY_ARG]);
+        close(parentToChild[PIPE_READ_SIDE]);
+        close(childToParent[PIPE_WRITE_SIDE]);
     } else {
-        // Proceso padre
-        close(parentToChild[0]); // Cierra lectura
-        close(childToParent[1]); // Cierra escritura
-        proceso_padre(argv[1], argv[2], parentToChild, childToParent);
-        close(parentToChild[1]); // Cierra escritura
-        close(childToParent[0]); // Cierra lectura
+        close(parentToChild[PIPE_READ_SIDE]);
+        close(childToParent[PIPE_WRITE_SIDE]);
+        proceso_padre(argv[PROGRAM_SOURCE_ARG], argv[PROGRAM_DESTINY_ARG], parentToChild, childToParent);
+        close(parentToChild[PIPE_WRITE_SIDE]);
+        close(childToParent[PIPE_READ_SIDE]);
         
-        wait(NULL); // Espera al hijo
+        waitpid(pid, NULL, 0);
     }
     
-    return 0;
+    return EXIT_SUCCESS;
 }

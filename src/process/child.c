@@ -4,43 +4,66 @@
 #include <unistd.h>
 #include "backup.h"
 
+extern const char   *CHILD_WAITING_PARENT_MESSAGE,
+                    *CHILD_PARENT_INSTRUCTIONS_MESSAGE,
+                    *CHILD_PARENT_FILES_COUNT_MESSAGE,
+                    *CHILD_PARENT_END_NOTIFY_MESSAGE,
+                    *CHILD_PENDING_FILES_MESSAGE,
+                    *END_PROCESS_FLAG,
+                    *FORMAT_BUILD_PATH,
+                    *FORMAT_COMMAND_COPY,
+                    *FORMAT_INT;
+
 void respaldar_archivo(const char *archivo_origen, const char *archivo_destino) {
-    char comando[512];
-    snprintf(comando, sizeof(comando), "cp %s %s", archivo_origen, archivo_destino);
+    char comando[COMMAND_SIZE];
+    snprintf(comando, COMMAND_SIZE, FORMAT_COMMAND_COPY, archivo_origen, archivo_destino);
     system(comando);
 }
 
-void proceso_hijo(int parentToChild[2], int childToParent[2], const char *directorio_origen, const char *directorio_respaldo) {
-    char buffer[256];
+void proceso_hijo(
+    int parentToChild[PIPE_FILE_DESCRIPTOR], 
+    int childToParent[PIPE_FILE_DESCRIPTOR], 
+    const char *directorio_origen, 
+    const char *directorio_respaldo
+) {
+    char buffer[BUFFER_SIZE];
     int total_archivos;
     
-    // Leer el número total de archivos del padre
-    read(parentToChild[0], buffer, sizeof(buffer));
+    read(parentToChild[PIPE_READ_SIDE], buffer, BUFFER_SIZE);
     total_archivos = atoi(buffer);
     
-    printf("HIJO(pid=%d) esperando mensaje de mi padre...\n", getpid());
-    printf("HIJO(pid=%d) , instrucción de mi padre: Hola hijo, realiza el respaldo de archivos\n", getpid());
-    printf("HIJO(pid=%d) , mensaje de mi padre: ¿Cuántos archivos?\n", getpid());
+    printf(CHILD_WAITING_PARENT_MESSAGE, getpid());
+    printf(CHILD_PARENT_INSTRUCTIONS_MESSAGE, getpid());
     
     int archivos_restantes = total_archivos;
+    printf(CHILD_PARENT_FILES_COUNT_MESSAGE, getpid(), total_archivos);
     
     while (1) {
-        read(parentToChild[0], buffer, sizeof(buffer));
+        read(parentToChild[PIPE_READ_SIDE], buffer, BUFFER_SIZE);
         
-        if (strcmp(buffer, "FIN") == 0) {
-            printf("HIJO (pid=%d): Adiós padre, terminé el respaldo!\n", getpid());
+        if (strcmp(buffer, END_PROCESS_FLAG) == 0) {
+            printf(CHILD_PARENT_END_NOTIFY_MESSAGE, getpid());
             break;
         }
         
-        // Respalda el archivo
-        char archivo_destino[256];
-        snprintf(archivo_destino, sizeof(archivo_destino), "%s/%s", directorio_respaldo, strrchr(buffer, '/') + 1);
+        char archivo_destino[FILE_PATH_SIZE];
+        snprintf(
+            archivo_destino, 
+            FILE_PATH_SIZE, 
+            FORMAT_BUILD_PATH, directorio_respaldo, 
+            strrchr(buffer, SLASH_CHAR) + 1
+        );
         respaldar_archivo(buffer, archivo_destino);
         
-        printf("\tHIJO (pid=%d), respaldándoselos el archivo %s\t| Pendientes: %d/%d\n", getpid(), strrchr(buffer, '/') + 1, --archivos_restantes, total_archivos);
+        printf(
+            CHILD_PENDING_FILES_MESSAGE, 
+            getpid(), 
+            strrchr(buffer, SLASH_CHAR) + 1, 
+            --archivos_restantes, 
+            total_archivos
+        );
     }
     
-    // Enviar el número de archivos respaldados al padre
-    snprintf(buffer, sizeof(buffer), "%d", total_archivos);
-    write(childToParent[1], buffer, sizeof(buffer));
+    snprintf(buffer, BUFFER_SIZE, FORMAT_INT, total_archivos);
+    write(childToParent[PIPE_WRITE_SIDE], buffer, BUFFER_SIZE);
 }
